@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import NetInfo from "@react-native-community/netinfo";
+import { QueryClient, QueryClientProvider, focusManager, onlineManager } from "@tanstack/react-query";
 
 import { AuthProvider, useAuth } from "../src/auth/authProvider";
 import { useUserStore } from "../src/stores/useUser";
@@ -38,9 +41,37 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: 1,
+            staleTime: 30_000,
+          },
+        },
+      })
+  );
   const [fontsLoaded] = useFonts({
     RubikGlitch: require("../assets/fonts/Rubik_Glitch/RubikGlitch-Regular.ttf"),
+    PermanentMarker: require("../assets/fonts/Permanent_Marker/PermanentMarker-Regular.ttf"),
   });
+
+  useEffect(() => {
+    const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
+      onlineManager.setOnline(Boolean(state.isConnected && state.isInternetReachable !== false));
+    });
+
+    const onAppStateChange = (status: AppStateStatus) => {
+      focusManager.setFocused(status === "active");
+    };
+    const appStateSub = AppState.addEventListener("change", onAppStateChange);
+
+    return () => {
+      unsubscribeNetInfo();
+      appStateSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -53,8 +84,10 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

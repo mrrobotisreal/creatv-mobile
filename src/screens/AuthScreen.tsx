@@ -13,6 +13,7 @@ import {
   TextStyle,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,10 +46,26 @@ type GradientTextProps = {
   style?: TextStyle;
 };
 
+function isValidComponent(component: unknown) {
+  if (typeof component === "function") {
+    return true;
+  }
+  if (typeof component === "object" && component !== null && "$$typeof" in (component as object)) {
+    return true;
+  }
+  return false;
+}
+
 function GradientText({ text, colors, style }: GradientTextProps) {
+  if (!isValidComponent(MaskedView) || !isValidComponent(LinearGradient)) {
+    return <Text style={[style, styles.gradientFallback]}>{text}</Text>;
+  }
   return (
-    <MaskedView maskElement={<Text style={[style, styles.gradientMask]}>{text}</Text>}>
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+    <MaskedView
+      androidRenderingMode="software"
+      maskElement={<Text style={[style, styles.gradientMask]}>{text}</Text>}
+    >
+      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientContainer}>
         <Text style={[style, styles.gradientHidden]}>{text}</Text>
       </LinearGradient>
     </MaskedView>
@@ -56,6 +73,7 @@ function GradientText({ text, colors, style }: GradientTextProps) {
 }
 
 export function AuthScreen() {
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<AuthMode>("signIn");
   const [formError, setFormError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -132,16 +150,19 @@ export function AuthScreen() {
 
   const isBusy = isSubmitting || authLoading || googleLoading;
   const submitLabel = mode === "signIn" ? "Sign In" : "Sign Up";
+  const googleLabel = mode === "signIn" ? "Sign In with Google" : "Sign Up with Google";
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 12 : 0}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         >
           <View style={styles.brandRow}>
             <Image
@@ -264,7 +285,7 @@ export function AuthScreen() {
               ) : (
                 <Image source={require("../../assets/google_icon.png")} style={styles.googleIcon} />
               )}
-              <Text style={styles.oauthText}>Sign In with Google</Text>
+              <Text style={styles.oauthText}>{googleLabel}</Text>
             </Pressable>
           </View>
 
@@ -299,7 +320,9 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.bg },
   scrollContent: {
     paddingHorizontal: 18,
-    paddingTop: 20,
+    paddingVertical: 24,
+    flexGrow: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
 
@@ -324,12 +347,19 @@ const styles = StyleSheet.create({
     fontFamily: "RubikGlitch",
     fontSize: 34,
     letterSpacing: 0.2,
+    color: COLORS.text,
   },
   gradientMask: {
-    color: "#000",
+    color: "#fff",
   },
   gradientHidden: {
     opacity: 0,
+  },
+  gradientContainer: {
+    alignSelf: "flex-start",
+  },
+  gradientFallback: {
+    color: COLORS.text,
   },
 
   card: {

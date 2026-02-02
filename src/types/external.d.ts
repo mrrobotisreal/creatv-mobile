@@ -9,3 +9,8 @@ declare module "expo-linear-gradient" {
   export const LinearGradient: ComponentType<any>;
 }
 
+declare module "expo-router/entry" {
+  const ExpoRouterEntry: ComponentType<any>;
+  export default ExpoRouterEntry;
+}
+

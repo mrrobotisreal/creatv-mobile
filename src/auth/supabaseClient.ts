@@ -15,7 +15,7 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   );
 }
 
-const KEY_STORAGE_KEY = "creatv:supabase:encryption-key";
+const KEY_STORAGE_KEY = "creatv_supabase_encryption_key";
 const STORAGE_PREFIX = "creatv:supabase:";
 
 async function getEncryptionKey(): Promise<Uint8Array> {

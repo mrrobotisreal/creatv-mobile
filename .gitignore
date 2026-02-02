@@ -38,5 +38,6 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-/ios
-/android
+# (intentionally tracked for custom native modules)
+build-*.apk
+build-*.ipa

@@ -83,7 +83,13 @@ export const authService: AuthService = {
     return data.session;
   },
   async signUpWithPassword(email, password) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: REDIRECT_URI,
+      },
+    });
     if (error) {
       throw error;
     }
