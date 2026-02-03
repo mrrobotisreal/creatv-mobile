@@ -56,6 +56,7 @@ import type { EngineQualityOption, PlaybackCandidate } from "../../../src/lib/pl
 import { SHARE_SURFACE_MOBILE_VIDEO_PLAYER, type ShareTarget } from "../../../src/types/share_links";
 
 const DEFAULT_QUALITY_OPTION: EngineQualityOption = { id: "auto", label: "Auto", requiresPremium: false };
+const CONTROLS_AUTOHIDE_MS = 1400;
 
 const PLAYBACK_SPEED_OPTIONS = [
   { label: "0.25x", value: 0.25 },
@@ -95,6 +96,8 @@ const SHARE_TARGETS: Array<{ id: ShareTarget; label: string; icon: keyof typeof 
   { id: "other", label: "More", icon: "share-outline" },
 ];
 
+const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
+
 function buildMediaUrl(value?: string | null) {
   if (!value) return undefined;
   const normalized = ensurePublicBucketUrl(value) ?? value;
@@ -132,6 +135,11 @@ export default function VideoPlayerScreen() {
   const [volume, setVolume] = useState(1);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [progressTrackWidth, setProgressTrackWidth] = useState(0);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubTimeSeconds, setScrubTimeSeconds] = useState<number | null>(null);
   const [volumeTrackWidth, setVolumeTrackWidth] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsView, setSettingsView] = useState<"root" | "playback" | "quality" | "sleep">("root");
@@ -156,6 +164,7 @@ export default function VideoPlayerScreen() {
   const sleepTimerDeadlineRef = useRef<number | null>(null);
   const [sleepTimerLabel, setSleepTimerLabel] = useState("Off");
   const [sleepTimerRemainingMs, setSleepTimerRemainingMs] = useState<number | null>(null);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const videoRef = useRef<VideoRef | null>(null);
   const engineRef = useRef<DashEngine | HlsEngine | FileEngine | null>(null);
@@ -182,6 +191,31 @@ export default function VideoPlayerScreen() {
         },
       }),
     [handleNavigateBack]
+  );
+
+  const clearControlsTimer = useCallback(() => {
+    if (controlsTimerRef.current) {
+      clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleControlsHide = useCallback(() => {
+    if (paused) return;
+    clearControlsTimer();
+    controlsTimerRef.current = setTimeout(() => {
+      setControlsVisible(false);
+    }, CONTROLS_AUTOHIDE_MS);
+  }, [clearControlsTimer, paused]);
+
+  const showControls = useCallback(
+    (autoHide = true) => {
+      setControlsVisible(true);
+      if (autoHide) {
+        scheduleControlsHide();
+      }
+    },
+    [scheduleControlsHide]
   );
 
   const hlsMasterKey = useMemo(() => {
@@ -248,13 +282,29 @@ export default function VideoPlayerScreen() {
     useCallback(() => {
       return () => {
         setPaused(true);
+        clearControlsTimer();
       };
-    }, [])
+    }, [clearControlsTimer])
   );
+
+  useEffect(() => {
+    if (paused) {
+      clearControlsTimer();
+      setControlsVisible(true);
+      return;
+    }
+    if (controlsVisible) {
+      scheduleControlsHide();
+    }
+    return clearControlsTimer;
+  }, [paused, controlsVisible, scheduleControlsHide, clearControlsTimer]);
 
   const handleVideoLoad = useCallback(
     (data: OnLoadData) => {
       engineRef.current?.handleTracks(data.videoTracks);
+      if (Number.isFinite(data.duration)) {
+        setDurationSeconds(data.duration);
+      }
     },
     []
   );
@@ -264,6 +314,10 @@ export default function VideoPlayerScreen() {
       setCurrentTime(data.currentTime);
     }
   }, []);
+
+  const handleVideoSurfacePress = useCallback(() => {
+    showControls(true);
+  }, [showControls]);
 
   const handleVideoError = useCallback(() => {
     if (candidateIndex + 1 < playbackCandidates.length) {
@@ -275,7 +329,61 @@ export default function VideoPlayerScreen() {
 
   const togglePlay = useCallback(() => {
     setPaused((prev) => !prev);
-  }, []);
+    showControls(true);
+  }, [showControls]);
+
+  const handleSeekToSeconds = useCallback(
+    (nextSeconds: number) => {
+      if (!Number.isFinite(nextSeconds) || durationSeconds <= 0) return;
+      const clamped = clamp(nextSeconds, 0, durationSeconds);
+      videoRef.current?.seek(clamped);
+      setCurrentTime(clamped);
+    },
+    [durationSeconds]
+  );
+
+  const getSeekTimeFromLocation = useCallback(
+    (locationX: number) => {
+      if (!progressTrackWidth || durationSeconds <= 0) return 0;
+      const ratio = clamp(locationX / progressTrackWidth, 0, 1);
+      return ratio * durationSeconds;
+    },
+    [durationSeconds, progressTrackWidth]
+  );
+
+  const progressResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          clearControlsTimer();
+          setIsScrubbing(true);
+          const nextTime = getSeekTimeFromLocation(evt.nativeEvent.locationX);
+          setScrubTimeSeconds(nextTime);
+          setControlsVisible(true);
+        },
+        onPanResponderMove: (evt) => {
+          const nextTime = getSeekTimeFromLocation(evt.nativeEvent.locationX);
+          setScrubTimeSeconds(nextTime);
+        },
+        onPanResponderRelease: (evt) => {
+          const nextTime = getSeekTimeFromLocation(evt.nativeEvent.locationX);
+          setIsScrubbing(false);
+          setScrubTimeSeconds(null);
+          handleSeekToSeconds(nextTime);
+          scheduleControlsHide();
+        },
+        onPanResponderTerminate: (evt) => {
+          const nextTime = getSeekTimeFromLocation(evt.nativeEvent.locationX);
+          setIsScrubbing(false);
+          setScrubTimeSeconds(null);
+          handleSeekToSeconds(nextTime);
+          scheduleControlsHide();
+        },
+      }),
+    [clearControlsTimer, getSeekTimeFromLocation, handleSeekToSeconds, scheduleControlsHide]
+  );
 
   const handleQualitySelect = useCallback(
     (option: EngineQualityOption) => {
@@ -546,6 +654,13 @@ export default function VideoPlayerScreen() {
   const descriptionText = video?.description ?? "";
   const subtitleLine = `${formatViews(video?.view_count)} - ${formatRelativeTime(video?.published_at || video?.created_at)}`;
   const shareTimestampDisplay = formatShareTimestamp(shareTimestampSeconds);
+  const displayedTimeSeconds = isScrubbing && scrubTimeSeconds != null ? scrubTimeSeconds : currentTime;
+  const progressRatio = durationSeconds > 0 ? clamp(displayedTimeSeconds / durationSeconds, 0, 1) : 0;
+  const progressFillWidth = Math.max(0, progressTrackWidth * progressRatio);
+  const progressThumbLeft = Math.max(0, progressTrackWidth * progressRatio);
+  const formattedCurrentTime = formatShareTimestamp(Math.floor(displayedTimeSeconds || 0));
+  const formattedDuration = durationSeconds > 0 ? formatShareTimestamp(Math.floor(durationSeconds)) : "0:00";
+  const shouldShowControls = controlsVisible || paused || isScrubbing;
 
   if (!videoId) {
     return (
@@ -587,53 +702,73 @@ export default function VideoPlayerScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.videoWrapper} {...swipeResponder.panHandlers}>
-          {!hasNativeVideo ? (
-            <View style={styles.videoFallback}>
-              <Text style={styles.mutedText}>
-                Video playback requires a development build with native modules enabled.
-              </Text>
-              <Text style={styles.mutedText}>Please rebuild the app to enable video playback.</Text>
+      <View style={styles.videoWrapper} {...swipeResponder.panHandlers}>
+        {!hasNativeVideo ? (
+          <View style={styles.videoFallback}>
+            <Text style={styles.mutedText}>
+              Video playback requires a development build with native modules enabled.
+            </Text>
+            <Text style={styles.mutedText}>Please rebuild the app to enable video playback.</Text>
+          </View>
+        ) : candidate ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: candidate.url, type: candidate.type }}
+            paused={paused}
+            volume={volume}
+            rate={playbackRate}
+            onLoad={handleVideoLoad}
+            onProgress={handleVideoProgress}
+            onError={handleVideoError}
+            onEnd={() => setPaused(true)}
+            playInBackground={false}
+            playWhenInactive={false}
+            resizeMode="contain"
+            poster={thumbnailUrl}
+            posterResizeMode="cover"
+            selectedVideoTrack={selectedVideoTrack}
+            style={styles.video}
+          />
+        ) : (
+          <View style={styles.videoFallback}>
+            <Text style={styles.mutedText}>No playback source available.</Text>
+          </View>
+        )}
+        {!shouldShowControls ? (
+          <Pressable style={styles.videoTapArea} onPress={handleVideoSurfacePress} />
+        ) : null}
+        {shouldShowControls ? (
+          <View style={styles.controlsOverlay} pointerEvents="box-none">
+            <View style={styles.controlsCenter}>
+              <Pressable style={styles.controlButton} onPress={togglePlay}>
+                <Ionicons name={paused ? "play" : "pause"} size={26} color="#fff" />
+              </Pressable>
             </View>
-          ) : candidate ? (
-            <Video
-              ref={videoRef}
-              source={{ uri: candidate.url, type: candidate.type }}
-              paused={paused}
-              volume={volume}
-              rate={playbackRate}
-              onLoad={handleVideoLoad}
-              onProgress={handleVideoProgress}
-              onError={handleVideoError}
-              onEnd={() => setPaused(true)}
-              playInBackground={false}
-              playWhenInactive={false}
-              resizeMode="contain"
-              poster={thumbnailUrl}
-              posterResizeMode="cover"
-              selectedVideoTrack={selectedVideoTrack}
-              style={styles.video}
-            />
-          ) : (
-            <View style={styles.videoFallback}>
-              <Text style={styles.mutedText}>No playback source available.</Text>
-            </View>
-          )}
-          {paused ? (
-            <Pressable style={styles.playOverlay} onPress={togglePlay}>
-              <View style={styles.playButton}>
-                <Ionicons name="play" size={24} color="#fff" />
+            <View style={styles.controlsBottom}>
+              <View style={styles.progressRow}>
+                <Text style={styles.progressTime}>{formattedCurrentTime}</Text>
+                <Text style={styles.progressTime}>{formattedDuration}</Text>
               </View>
-            </Pressable>
-          ) : null}
-          {playbackError ? (
-            <View style={styles.errorBadge}>
-              <Text style={styles.errorText}>{playbackError}</Text>
+              <View
+                style={styles.progressBar}
+                onLayout={(event) => setProgressTrackWidth(event.nativeEvent.layout.width)}
+                {...progressResponder.panHandlers}
+              >
+                <View style={styles.progressBarBg} />
+                <View style={[styles.progressBarFill, { width: progressFillWidth }]} />
+                <View style={[styles.progressThumb, { left: progressThumbLeft }]} />
+              </View>
             </View>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
+        {playbackError ? (
+          <View style={styles.errorBadge}>
+            <Text style={styles.errorText}>{playbackError}</Text>
+          </View>
+        ) : null}
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.metaSection}>
           <Text style={styles.title}>{video.title}</Text>
           <Text style={styles.subtitle}>{subtitleLine}</Text>
@@ -969,6 +1104,8 @@ const styles = StyleSheet.create({
     width: "100%",
     aspectRatio: 16 / 9,
     backgroundColor: "#000",
+    position: "relative",
+    overflow: "hidden",
   },
   video: {
     width: "100%",
@@ -984,6 +1121,69 @@ const styles = StyleSheet.create({
     inset: 0,
     alignItems: "center",
     justifyContent: "center",
+  },
+  videoTapArea: {
+    position: "absolute",
+    inset: 0,
+  },
+  controlsOverlay: {
+    position: "absolute",
+    inset: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: "space-between",
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  controlsCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  controlButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  controlsBottom: {
+    gap: 8,
+  },
+  progressRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  progressTime: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  progressBar: {
+    height: 22,
+    justifyContent: "center",
+  },
+  progressBarBg: {
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  progressBarFill: {
+    position: "absolute",
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: COLORS.accent,
+    left: 0,
+    top: 9,
+  },
+  progressThumb: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#fff",
+    top: 5,
+    transform: [{ translateX: -6 }],
   },
   playButton: {
     width: 54,
