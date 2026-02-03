@@ -1,4 +1,5 @@
-![CreaTV Banner](./assets/readme-banner.png)
+
+<img width="1500" height="300" alt="CreaTV_WinAppsProjectCard" src="https://github.com/user-attachments/assets/1bd056f0-cb9a-43eb-aae1-bc66e3bf330c" />
 
 <p align="center">
   <a href="https://docs.creatv.io"><strong>docs.creatv.io</strong></a>
