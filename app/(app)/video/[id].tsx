@@ -4,6 +4,7 @@ import {
   Image,
   Linking,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +18,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import Video, {
   SelectedVideoTrackType,
   type OnLoadData,
@@ -162,6 +164,25 @@ export default function VideoPlayerScreen() {
     () => Boolean(typeof UIManager?.getViewManagerConfig === "function" && UIManager.getViewManagerConfig("RCTVideo")),
     []
   );
+  const handleNavigateBack = useCallback(() => {
+    setPaused(true);
+    router.back();
+  }, [router]);
+  const swipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_evt, gesture) =>
+          Math.abs(gesture.dy) > 12 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gesture) =>
+          Math.abs(gesture.dy) > 12 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderRelease: (_evt, gesture) => {
+          if (gesture.dy > 120 && gesture.vy > 0.4) {
+            handleNavigateBack();
+          }
+        },
+      }),
+    [handleNavigateBack]
+  );
 
   const hlsMasterKey = useMemo(() => {
     if (video?.hls_master_playlist_key) return video.hls_master_playlist_key;
@@ -222,6 +243,14 @@ export default function VideoPlayerScreen() {
       if (sleepTimerIntervalRef.current) clearInterval(sleepTimerIntervalRef.current);
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setPaused(true);
+      };
+    }, [])
+  );
 
   const handleVideoLoad = useCallback(
     (data: OnLoadData) => {
@@ -559,7 +588,7 @@ export default function VideoPlayerScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.videoWrapper}>
+        <View style={styles.videoWrapper} {...swipeResponder.panHandlers}>
           {!hasNativeVideo ? (
             <View style={styles.videoFallback}>
               <Text style={styles.mutedText}>
@@ -578,6 +607,8 @@ export default function VideoPlayerScreen() {
               onProgress={handleVideoProgress}
               onError={handleVideoError}
               onEnd={() => setPaused(true)}
+              playInBackground={false}
+              playWhenInactive={false}
               resizeMode="contain"
               poster={thumbnailUrl}
               posterResizeMode="cover"
@@ -589,11 +620,13 @@ export default function VideoPlayerScreen() {
               <Text style={styles.mutedText}>No playback source available.</Text>
             </View>
           )}
-          <Pressable style={styles.playOverlay} onPress={togglePlay}>
-            <View style={styles.playButton}>
-              <Ionicons name={paused ? "play" : "pause"} size={24} color="#fff" />
-            </View>
-          </Pressable>
+          {paused ? (
+            <Pressable style={styles.playOverlay} onPress={togglePlay}>
+              <View style={styles.playButton}>
+                <Ionicons name="play" size={24} color="#fff" />
+              </View>
+            </Pressable>
+          ) : null}
           {playbackError ? (
             <View style={styles.errorBadge}>
               <Text style={styles.errorText}>{playbackError}</Text>

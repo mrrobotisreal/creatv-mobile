@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TextStyle,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,8 +17,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNetInfo } from "@react-native-community/netinfo";
-import MaskedView from "@react-native-masked-view/masked-view";
-import { LinearGradient } from "expo-linear-gradient";
+import { GradientText } from "../components/GradientText";
 
 import { useAuth } from "../auth/authProvider";
 
@@ -39,38 +37,6 @@ type SignInForm = z.infer<typeof signInSchema>;
 type SignUpForm = z.infer<typeof signUpSchema>;
 
 type GradientColors = readonly [string, string, ...string[]];
-
-type GradientTextProps = {
-  text: string;
-  colors: GradientColors;
-  style?: TextStyle;
-};
-
-function isValidComponent(component: unknown) {
-  if (typeof component === "function") {
-    return true;
-  }
-  if (typeof component === "object" && component !== null && "$$typeof" in (component as object)) {
-    return true;
-  }
-  return false;
-}
-
-function GradientText({ text, colors, style }: GradientTextProps) {
-  if (!isValidComponent(MaskedView) || !isValidComponent(LinearGradient)) {
-    return <Text style={[style, styles.gradientFallback]}>{text}</Text>;
-  }
-  return (
-    <MaskedView
-      androidRenderingMode="software"
-      maskElement={<Text style={[style, styles.gradientMask]}>{text}</Text>}
-    >
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientContainer}>
-        <Text style={[style, styles.gradientHidden]}>{text}</Text>
-      </LinearGradient>
-    </MaskedView>
-  );
-}
 
 export function AuthScreen() {
   const insets = useSafeAreaInsets();

@@ -81,6 +81,13 @@ export default function AppLayout() {
           tabBarIcon: ({ size, focused }) => <UserAvatarIcon size={size} focused={focused} />,
         }}
       />
+      <Tabs.Screen
+        name="video/[id]"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
     </Tabs>
   );
 }

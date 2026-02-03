@@ -3,6 +3,30 @@
     "version": ">= 10.0.0"
   },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ffjatdorqwihtyzcwfvc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PROJECT_ID": "ffjatdorqwihtyzcwfvc",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmamF0ZG9ycXdpaHR5emN3ZnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDE2NzcsImV4cCI6MjA4MTQxNzY3N30.TGRz3-nR0CV3RvPXT4BKLtFaoupA9j0SEcsTSljJqDA",
+        "EXPO_PUBLIC_API_GATEWAY_URL": "https://api.creatv.dev",
+        "EXPO_PUBLIC_USER_API_URL": "https://api.creatv.dev/v1/users",
+        "EXPO_PUBLIC_VIDEOMETADATA_API_URL": "https://api.creatv.dev/v1/video-metadata",
+        "EXPO_PUBLIC_UPLOAD_API_URL": "https://api.creatv.dev/v1/upload",
+        "EXPO_PUBLIC_TRANSCODING_API_URL": "https://api.creatv.dev/v1/transcoding",
+        "EXPO_PUBLIC_SEARCH_API_URL": "https://api.creatv.dev/v1/search",
+        "EXPO_PUBLIC_ADS_API_URL": "https://api.creatv.dev/v1/ads",
+        "EXPO_PUBLIC_SNIPPETS_API_URL": "https://api.creatv.dev/v1/snippets",
+        "EXPO_PUBLIC_RECOMMENDATIONS_API_URL": "https://api.creatv.dev/v1/recommendations",
+        "EXPO_PUBLIC_ANALYTICS_API_URL": "https://api.creatv.dev/v1/analytics",
+        "EXPO_PUBLIC_SHARING_API_URL": "https://api.creatv.dev/v1/sharing",
+        "EXPO_PUBLIC_PUBLIC_BUCKET_BASE_URL": "https://cdn.creatv.io",
+        "EXPO_PUBLIC_WEB_BASE_URL": "https://creatv.io",
+        "EXPO_PUBLIC_MEDIA_CDN_URL": "https://cdn.creatv.io"
+      }
+    },
     "apk": {
       "android": {
         "buildType": "apk"

@@ -1,7 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { FlatList, Image, StyleSheet, Text, TextInput, TextStyle, View } from "react-native";
-import MaskedView from "@react-native-masked-view/masked-view";
-import { LinearGradient } from "expo-linear-gradient";
+import { FlatList, Image, StyleSheet, Text, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,6 +7,7 @@ import { useRouter } from "expo-router";
 
 import { useListLatestVideos, type LatestVideoItem } from "../../src/hooks/useListLatestVideos";
 import { VideoCard } from "../../src/components/VideoCard";
+import { GradientText } from "../../src/components/GradientText";
 import { useUserStore } from "../../src/stores/useUser";
 
 type GradientColors = readonly [string, string, ...string[]];
@@ -21,22 +20,6 @@ function isValidComponent(component: unknown) {
     return true;
   }
   return false;
-}
-
-function GradientText({ text, colors, style }: { text: string; colors: GradientColors; style?: TextStyle }) {
-  if (!isValidComponent(MaskedView) || !isValidComponent(LinearGradient)) {
-    return <Text style={[style, styles.gradientFallback]}>{text}</Text>;
-  }
-  return (
-    <MaskedView
-      androidRenderingMode="software"
-      maskElement={<Text style={[style, styles.gradientMask]}>{text}</Text>}
-    >
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientContainer}>
-        <Text style={[style, styles.gradientHidden]}>{text}</Text>
-      </LinearGradient>
-    </MaskedView>
-  );
 }
 
 export default function HomeScreen() {
@@ -73,13 +56,13 @@ export default function HomeScreen() {
         <View style={styles.brandRow}>
           <Image source={require("../../assets/logo.png")} style={styles.brandLogo} resizeMode="contain" />
           <View style={styles.brandTextRow}>
-            <GradientText text="Crea" colors={GRADIENTS.crea} style={styles.brandText} />
-            <GradientText text="TV" colors={GRADIENTS.tv} style={styles.brandText} />
-            {user?.is_premium ? (
+            <GradientText text="Crea" colors={GRADIENTS.crea} style={styles.brandText} numberOfLines={1} ellipsizeMode="clip" />
+            <GradientText text="TV" colors={GRADIENTS.tv} style={styles.brandText} numberOfLines={1} ellipsizeMode="clip" />
+            {/* {user?.is_premium ? (
               <View style={styles.premiumBadge}>
-                <GradientText text="Premium" colors={GRADIENTS.premium} style={styles.premiumText} />
+                <GradientText text="P" colors={GRADIENTS.premium} style={styles.premiumText} numberOfLines={1} ellipsizeMode="clip" />
               </View>
-            ) : null}
+            ) : null} */}
           </View>
         </View>
         <View style={styles.searchContainer}>
@@ -168,11 +151,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "nowrap",
+    flexShrink: 0,
   },
   brandText: {
     fontFamily: "RubikGlitch",
     fontSize: 22,
     color: COLORS.text,
+    flexWrap: "nowrap",
   },
   premiumBadge: {
     marginLeft: 6,
@@ -181,11 +166,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "rgba(16,185,129,0.8)",
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   premiumText: {
     fontFamily: "PermanentMarker",
     fontSize: 10,
     letterSpacing: 0.4,
+    textAlign: "center",
   },
   gradientMask: {
     color: "#fff",
