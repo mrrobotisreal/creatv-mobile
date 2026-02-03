@@ -25,6 +25,10 @@ CreaTV is a next-generation video platform built to empower creators and deliver
 
 **Docs:** https://docs.creatv.io
 
+**Demo _(turn volume up for full demo experience)_:**
+
+<video controls src="https://github.com/user-attachments/assets/913942a8-7e6a-434d-b22d-016a8d784b3f"></video>
+
 ---
 
 ## Table of Contents
